@@ -6,5 +6,7 @@ router.post('/UserSignup', userController.userSignup);
 router.post('/InstructorSignup', userController.instructorSignup);
 router.post('/UserLogin', userController.userLogin);
 router.post('/InstructorLogin', userController.instructorLogin);
+router.post('/ForgotPassword', userController.forgotpassword);
+router.post('/ResetPassword', userController.resetpassword);
 
 module.exports = router;
