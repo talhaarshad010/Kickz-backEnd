@@ -3,10 +3,9 @@ const userController = require('./usercontroller');
 const router = express.Router();
 
 router.post('/UserSignup', userController.userSignup);
-router.post('/InstructorSignup', userController.instructorSignup);
 router.post('/UserLogin', userController.userLogin);
-router.post('/InstructorLogin', userController.instructorLogin);
-router.post('/ForgotPassword', userController.forgotpassword);
-router.post('/ResetPassword', userController.resetpassword);
+router.post('/ForgotPassword', userController.forgetpassword);
+router.post('/VerifyOtp', userController.verifyOtp);
+router.post('/UpdatePassword', userController.updatePassword);
 
 module.exports = router;
