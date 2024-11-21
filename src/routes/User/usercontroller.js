@@ -82,10 +82,7 @@ const userLogin = async (req, res) => {
   }
 };
 const forgetpassword = async (req, res) => {
-  console.log('Hit!');
-
   const {userEmail} = req.body;
-  console.log('Email:', userEmail);
 
   try {
     const User = await userSchema.findOne({userEmail});
@@ -233,8 +230,6 @@ const verifyOtp = async (req, res) => {
 
 const updatePassword = async (req, res) => {
   const {userEmail, otp, newPassword} = req.body;
-  console.log('Received data:', {userEmail, otp, newPassword});
-
   try {
     const user = await userSchema.findOne({userEmail});
 
