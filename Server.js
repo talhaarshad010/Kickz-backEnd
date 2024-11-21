@@ -11,6 +11,7 @@ const Port = 6000;
 
 // DataBase Path //
 require('./src/config/dataBase');
+
 // DataBase Path //
 App.use(bodyParser.json());
 App.use(bodyParser.urlencoded({extended: true}));
