@@ -2,6 +2,7 @@ const userSchema = require('../../models/userModel');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const {default: mongoose} = require('mongoose');
+const {sendEmail} = require('../../Helpers/mailer');
 
 const userSignup = async (req, res) => {
   const {userEmail, userPassword} = req.body;
@@ -39,6 +40,7 @@ const userSignup = async (req, res) => {
 
 const userLogin = async (req, res) => {
   const {userEmail, userPassword} = req.body;
+  console.log(userEmail, userPassword);
   try {
     let checkUser = await userSchema.findOne({
       userEmail: userEmail,
@@ -81,10 +83,13 @@ const userLogin = async (req, res) => {
   }
 };
 const forgetpassword = async (req, res) => {
+  console.log('Hit!');
+
   const {userEmail} = req.body;
-  console.log('email: ', userEmail);
+  console.log('Email:', userEmail);
 
   try {
+    // Find user by email
     const User = await userSchema.findOne({userEmail});
     if (!User) {
       return res.status(400).json({
@@ -93,10 +98,11 @@ const forgetpassword = async (req, res) => {
       });
     }
 
+    const {userName} = User;
     const currentTime = new Date();
-    const OTP_EXPIRY_DURATION = 2 * 60 * 1000; // 1 minute in milliseconds
+    const OTP_EXPIRY_DURATION = 2 * 60 * 1000; // 2 minutes in milliseconds
 
-    // Check if a code was generated and if it's within the last 1 minute
+    // Check if a code was generated and if it's within the expiry duration
     if (
       User.expiryCode &&
       currentTime - new Date(User.expiryCode) < OTP_EXPIRY_DURATION
@@ -110,19 +116,64 @@ const forgetpassword = async (req, res) => {
       });
     }
 
-    // Generate OTP code
+    // Generate OTP code (4 digits)
     const randomString = '1234567890';
     let code = '';
     for (let i = 0; i < 4; i++) {
       code += randomString[Math.floor(Math.random() * randomString.length)];
     }
 
-    console.log(`Generated OTP code for ${userEmail}: ${code}`);
+    // Set OTP expiry time
+    const expiryCode = new Date(currentTime.getTime() + OTP_EXPIRY_DURATION); // Set expiry time to 2 minutes from now
 
-    // Update the OTP and expiry time
-    User.otp = code;
-    User.expiryCode = new Date(currentTime.getTime() + OTP_EXPIRY_DURATION); // Set expiry time to 1 minute from now
-    await User.save();
+    // Update user with the OTP and its expiry time
+    const updateUser = await userSchema.updateOne(
+      {_id: User._id},
+      {
+        otp: code,
+        expiryCode: expiryCode,
+      },
+    );
+
+    // Check if user update was successful
+    if (!!updateUser) {
+      const HTML_Email = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Email Template</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+          <p>Dear ${userName},</p>
+          <p>Here is your verification code to reset your password. Please use it within the next 2 minutes.</p>
+          <hr>
+          <p><strong>Verification Code:</strong> ${code}</p>
+          <hr>
+          <p>If you didn't request this verification code, please ignore this message.</p>
+          <br>
+          <p>Best regards,<br>Kicks Support Team</p>
+        </body>
+        </html>
+      `;
+
+      const mailContent = {
+        from: 'talha@logicloopsolutions.net',
+        to: userEmail,
+        subject: 'Verification Code - Kicks',
+        html: HTML_Email,
+      };
+
+      // Ensure sendEmail function is available and working
+      await sendEmail(mailContent);
+      console.log(`Generated OTP code for ${userEmail}: ${code}`);
+    } else {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update user OTP',
+      });
+    }
 
     res.send({
       success: true,
@@ -179,11 +230,6 @@ const verifyOtp = async (req, res) => {
       });
     }
 
-    // OTP is verified, clear the OTP and expiration time
-    // user.otp = null;
-    // user.expiryCode = null;
-    // await user.save();
-
     return res.status(200).json({
       success: true,
       message: 'OTP verified successfully',
@@ -196,61 +242,6 @@ const verifyOtp = async (req, res) => {
     });
   }
 };
-
-// const verifyOtp = async (req, res) => {
-//   const {userEmail, otp} = req.body;
-//   console.log('is data receive:', userEmail, otp);
-//   try {
-//     const user = await userSchema.findOne({userEmail});
-//     // console.log('the user we get:  ', user);
-//     if (!user) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'User not found',
-//       });
-//     }
-
-//     // Check if the OTP has been set for the use
-//     if (!user.otp || !user.expiryCode) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'OTP not generated, please request a new one',
-//       });
-//     }
-
-//     // Check if OTP has expired
-//     if (new Date() > user.expiryCode) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'OTP has expired, please request a new one',
-//       });
-//     }
-
-//     // Verify the OTP
-//     if (user.otp !== otp) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Invalid OTP',
-//       });
-//     }
-
-//     // OTP is verified, clear the OTP and expiration time
-//     user.otp = null;
-//     user.expiryCode = null;
-//     await user.save();
-
-//     res.send({
-//       success: true,
-//       message: 'OTP verified successfully',
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: 'An error occurred during OTP verification',
-//       // error,
-//     });
-//   }
-// };
 
 const updatePassword = async (req, res) => {
   const {userEmail, otp, newPassword} = req.body;
