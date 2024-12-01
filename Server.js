@@ -7,7 +7,7 @@ const router = require('./src/routes');
 const bodyParser = require('body-parser');
 
 const App = express();
-const Port = 8080;
+const Port = 3000;
 
 // DataBase Path //
 require('./src/config/dataBase');
