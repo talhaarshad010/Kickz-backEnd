@@ -81,107 +81,221 @@ const userLogin = async (req, res) => {
     });
   }
 };
+
 const forgetpassword = async (req, res) => {
   const {userEmail} = req.body;
 
+  if (!userEmail) {
+    return res.status(400).json({
+      message: 'Email is required',
+      status: false,
+    });
+  }
+
   try {
-    // Find user by email
-    const User = await userSchema.findOne({userEmail});
-    if (!User) {
-      return res.status(400).json({
-        success: false,
-        message: "Email doesn't exist",
+    // Check if the user exists
+    const findUser = await userSchema.findOne({userEmail});
+    if (!findUser) {
+      return res.status(404).json({
+        message: 'User not found',
+        status: false,
       });
     }
 
-    const {userName} = User;
-    const currentTime = new Date();
-    const OTP_EXPIRY_DURATION = 2 * 60 * 1000; // 2 minutes in ms
+    const {_id, userName} = findUser;
 
-    // Check if OTP exists and is not expired
-    if (
-      User.expiryCode &&
-      currentTime - new Date(User.expiryCode) < OTP_EXPIRY_DURATION
-    ) {
-      const timeDifference = (currentTime - new Date(User.expiryCode)) / 1000; // in seconds
-      return res.status(429).json({
-        success: false,
-        message: `Please wait ${Math.ceil(
-          60 - timeDifference,
-        )} seconds before requesting a new code.`,
-      });
+    // Generate a random 4-digit code
+    const Random = '0123456789';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+      code += Random[Math.floor(Math.random() * Random.length)];
     }
 
-    // Generate 4-digit OTP using crypto for randomness
-    const otp = crypto.randomInt(1000, 9999); // Generate a random 4-digit number
-    const expiryCode = new Date(currentTime.getTime() + OTP_EXPIRY_DURATION); // Expiry time
+    // Set expiry time for the OTP (2 minutes)
+    const expiryDate = new Date(Date.now() + 120000);
 
-    // Update user with OTP and expiry code
+    // Update the user with the reset password verification code and expiry
     const updateUser = await userSchema.updateOne(
-      {_id: User._id},
+      {_id},
       {
         $set: {
-          otp,
-          expiryCode,
+          resetPasswordVerificationCode: code,
+          resetcodeExpiry: expiryDate,
         },
       },
     );
 
-    // If update was unsuccessful
-    if (updateUser.nModified === 0) {
+    // Check if the update was successful
+    // if (updateUser.modifiedCount === 0) {
+    //   return res.status(500).json({
+    //     message: 'Failed to update user with reset code',
+    //     status: false,
+    //   });
+    // }
+
+    // Prepare email content
+    const htmlEmail = `
+      <!DOCTYPE html>
+       <html lang="en">
+       <head>
+         <meta charset="UTF-8">
+         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+         <title>Email Template</title>
+       </head>
+       <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+         <p>Dear ${userName},</p>
+         <p>Here is your verification code to reset your password. Please use it within the next 2 minutes.</p>
+         <hr>
+         <p><strong>Verification Code:</strong> ${code}</p>
+         <hr>
+         <p>If you didn't request this verification code, please ignore this message.</p>
+         <br>
+         <p>Best regards,<br>Kicks Support Team</p>
+       </body>
+       </html>
+    `;
+
+    // Mail content
+    const mailContent = {
+      from: 'talha@logicloopsolutions.net', // Sender
+      to: userEmail, // Receiver
+      subject: 'Verification Code - Kicks',
+      html: htmlEmail,
+    };
+
+    // Send email asynchronously, ensuring email is sent
+    try {
+      await sendEmail(mailContent); // Assuming sendEmail is an async function
+      console.log('Verification code sent to:', userEmail);
+    } catch (emailError) {
+      console.error('Error sending email:', emailError);
       return res.status(500).json({
-        success: false,
-        message: 'Failed to update user OTP.',
+        message: 'Failed to send verification email',
+        status: false,
+        error: emailError.message,
       });
     }
 
-    // Prepare the HTML email content
-    const HTML_Email = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Email Template</title>
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Dear ${userName},</p>
-        <p>Here is your verification code to reset your password. Please use it within the next 2 minutes.</p>
-        <hr>
-        <p><strong>Verification Code:</strong> ${otp}</p>
-        <hr>
-        <p>If you didn't request this verification code, please ignore this message.</p>
-        <br>
-        <p>Best regards,<br>Kicks Support Team</p>
-      </body>
-      </html>
-    `;
-
-    const mailContent = {
-      from: 'talha@logicloopsolutions.net',
-      to: userEmail,
-      subject: 'Verification Code - Kicks',
-      html: HTML_Email,
-    };
-
-    // Send the email
-    await sendEmail(mailContent); // Ensure this function is correctly defined/imported
-
-    console.log(`Generated OTP code for ${userEmail}: ${otp}`);
-
-    res.send({
-      success: true,
-      message: `Code has been sent to ${userEmail}, please check your email.`,
+    // Send successful response
+    res.status(200).json({
+      message: 'Code sent successfully',
+      status: true,
+      data: {
+        id: _id,
+        userEmail,
+      },
     });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in forgetpassword:', error);
     res.status(500).json({
       message: 'An error occurred',
-      success: false,
-      error: error.message, // Log only the message for the user
+      status: false,
+      error: error.message || error,
     });
   }
 };
+
+// const forgetpassword = async (req, res) => {
+//   const {userEmail} = req.body;
+
+//   try {
+//     // Find user by email
+//     const User = await userSchema.findOne({userEmail});
+//     if (!User) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email doesn't exist",
+//       });
+//     }
+
+//     const {userName} = User;
+//     const currentTime = new Date();
+//     const OTP_EXPIRY_DURATION = 2 * 60 * 1000; // 2 minutes in ms
+
+//     // Check if OTP exists and is not expired
+//     if (
+//       User.expiryCode &&
+//       currentTime - new Date(User.expiryCode) < OTP_EXPIRY_DURATION
+//     ) {
+//       const timeDifference = (currentTime - new Date(User.expiryCode)) / 1000; // in seconds
+//       return res.status(429).json({
+//         success: false,
+//         message: `Please wait ${Math.ceil(
+//           60 - timeDifference,
+//         )} seconds before requesting a new code.`,
+//       });
+//     }
+
+//     // Generate 4-digit OTP using crypto for randomness
+//     const otp = crypto.randomInt(1000, 9999); // Generate a random 4-digit number
+//     const expiryCode = new Date(currentTime.getTime() + OTP_EXPIRY_DURATION); // Expiry time
+
+//     // Update user with OTP and expiry code
+//     const updateUser = await userSchema.updateOne(
+//       {_id: User._id},
+//       {
+//         $set: {
+//           otp,
+//           expiryCode,
+//         },
+//       },
+//     );
+
+//     // If update was unsuccessful
+//     if (updateUser.nModified === 0) {
+//       return res.status(500).json({
+//         success: false,
+//         message: 'Failed to update user OTP.',
+//       });
+//     }
+
+//     // Prepare the HTML email content
+//     const HTML_Email = `
+//       <!DOCTYPE html>
+//       <html lang="en">
+//       <head>
+//         <meta charset="UTF-8">
+//         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+//         <title>Email Template</title>
+//       </head>
+//       <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+//         <p>Dear ${userName},</p>
+//         <p>Here is your verification code to reset your password. Please use it within the next 2 minutes.</p>
+//         <hr>
+//         <p><strong>Verification Code:</strong> ${otp}</p>
+//         <hr>
+//         <p>If you didn't request this verification code, please ignore this message.</p>
+//         <br>
+//         <p>Best regards,<br>Kicks Support Team</p>
+//       </body>
+//       </html>
+//     `;
+
+//     const mailContent = {
+//       from: 'talha@logicloopsolutions.net',
+//       to: userEmail,
+//       subject: 'Verification Code - Kicks',
+//       html: HTML_Email,
+//     };
+
+//     // Send the email
+//     await sendEmail(mailContent); // Ensure this function is correctly defined/imported
+
+//     console.log(`Generated OTP code for ${userEmail}: ${otp}`);
+
+//     res.send({
+//       success: true,
+//       message: `Code has been sent to ${userEmail}, please check your email.`,
+//     });
+//   } catch (error) {
+//     console.error('Error:', error);
+//     res.status(500).json({
+//       message: 'An error occurred',
+//       success: false,
+//       error: error.message, // Log only the message for the user
+//     });
+//   }
+// };
 
 const verifyOtp = async (req, res) => {
   const {userEmail, otp} = req.body;

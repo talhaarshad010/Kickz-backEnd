@@ -19,11 +19,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    resetPasswordVerificationCode: {
+      type: String,
+      default: null,
+    },
     otp: {
       type: String,
       default: null,
     },
     expiryCode: {
+      type: Date,
+      default: null,
+    },
+    resetcodeExpiry: {
       type: Date,
       default: null,
     },
