@@ -157,13 +157,12 @@ const forgetpassword = async (req, res) => {
 
     // Mail content
     const mailContent = {
-      from: 'talha@logicloopsolutions.net', // Sender
-      to: userEmail, // Receiver
+      from: 'talha@logicloopsolutions.net',
+      to: userEmail,
       subject: 'Verification Code - Kicks',
       html: htmlEmail,
     };
 
-    // Send email asynchronously, ensuring email is sent
     try {
       await sendEmail(mailContent); // Assuming sendEmail is an async function
       console.log('Verification code sent to:', userEmail);
@@ -176,7 +175,6 @@ const forgetpassword = async (req, res) => {
       });
     }
 
-    // Send successful response
     res.status(200).json({
       message: 'Code sent successfully',
       status: true,
